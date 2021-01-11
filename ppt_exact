@@ -1,0 +1,79 @@
+from pptx import Presentation
+from pptx.enum.shapes import MSO_SHAPE_TYPE
+from pptx.util import Inches
+import os
+
+# Template for creating new presentations
+to_fhand = "../../Documents/Template.pptx"
+
+# Match the slides from source presentation to output presentation
+# This can be done as you need, but the keys of the dictionary should be the slide numbers of the source presentation and
+# the values should be the slide numbers of the output presentation
+d1 = dict(zip(range(5, 30), range(7, 32)))
+d2 = dict(zip(range(33, 45), range(38, 50)))
+d1.update(d2)
+
+# Adjusting the slide numbers for the output presentation (counting from 0 instead of 1)
+to_from_dict_adjusted = dict()
+for key, value in d1.items():
+    to_from_dict_adjusted[key] = value - 1
+
+# Store image file names for deletion
+image_files = list()
+
+# Read through source presentations slides, find pictures
+counter = 0
+def iter_picture_shapes(prs):
+    global counter
+    for slide in prs.slides:
+        counter += 1
+        for shape in slide.shapes:
+            if shape.shape_type == MSO_SHAPE_TYPE.PICTURE:
+                yield shape
+
+# Grabs the images from source presentation, creates image files, calls apply_images
+# the keys of the to_from_dict are the slides with images we want
+def write_images(prs, prs2, pairs, to_filename):
+    global counter
+    for picture in iter_picture_shapes(prs):
+        if counter in pairs.keys():
+            image = picture.image
+            image_bytes = image.blob
+            image_filename = "image%s.%s" % (counter, image.ext)
+            image_files.append(image_filename)
+            with open(image_filename, "wb") as f:
+                f.write(image_bytes)
+                apply_images(prs2, pairs, image_filename, to_filename)
+
+# Saves the selected images from the source presentation into the output presentation
+# The values of the to_from_dict_adjusted are the image destinations
+def apply_images(prs2, pairs, filename, to_filename):
+    global counter
+    slide = prs2.slides[pairs[counter]]
+    pic = slide.shapes.add_picture(filename, Inches(0.4), Inches(0.75))
+    prs2.save(to_filename)
+
+# Upon completion of the application, delete all image files
+def remove_images(image_files):
+    for item in image_files:
+        os.remove(item)
+
+# directory_path_prefix is the path we want to walk in order to create multiple
+# presentations from one folder
+directory_path_prefix = "../../Downloads/pp_exact/"
+for dirpath, dirnames, files in os.walk(directory_path_prefix):
+    for file_name in files:
+        print(file_name)
+        fhand = directory_path_prefix + file_name
+        # create a Presentation instance of source presentation
+        pres = Presentation(fhand)
+        # Create Presentation instance of the template/output_presentation
+        pres2 = Presentation(to_fhand)
+        # input the language name which is then concatenated to the file output name
+        to_file_name_input = input("Input Language: ")
+        # to_file_name = "../../Documents/" + to_file_name_input + "_Pilot_analysis.pptx"
+        to_file_name = "../../Documents/" + to_file_name_input + "_Pretest_analysis.pptx"
+        write_images(pres, pres2, to_from_dict_adjusted, to_file_name)
+        remove_images(image_files)
+        image_files = []
+        counter = 0
